@@ -1,0 +1,35 @@
+{
+  "name": "scripts",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "pdf": "node images-to-pdf/images-to-pdf.js",
+    "img-bg-alpha": "node remove-iamge-background.js",
+    "compress-img:compress": "cd compress-img && npx ts-node compress.ts",
+    "compress-img:compress-original": "cd compress-img && npx ts-node compress-original-type.ts",
+    "compress-img:archive": "cd compress-img && npx ts-node archive.ts",
+    "compress-img:compress-and-archive": "npm run compress-img:compress && npm run compress-img:archive",
+    "compress-img:compress-original-and-archive": "npm run compress-img:compress-original && npm run compress-img:archive",
+    "remove-bg:process": "cd remove-img-bg && node remove-image-background.js",
+    "remove-bg:archive": "cd remove-img-bg && node archive.js",
+    "remove-bg:process-and-archive": "npm run remove-bg:process && npm run remove-bg:archive"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@imgly/background-removal": "^1.7.0",
+    "@imgly/background-removal-node": "^1.4.5",
+    "jimp": "^1.6.0",
+    "onnxruntime-node": "^1.20.1",
+    "pdfkit": "^0.16.0",
+    "sharp": "^0.33.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.2.1",
+    "@types/sharp": "^0.31.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  }
+}
