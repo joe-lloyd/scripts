@@ -3,9 +3,12 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "ocr": "tsx src/index.ts"
+        "ocr": "tsx src/index.ts",
+        "md": "tsx src/create-md.ts"
     },
     "dependencies": {
+        "pdf-lib": "^1.17.1",
+        "pdf-parse": "^2.4.5",
         "tsx": "^4.7.0"
     }
 }
