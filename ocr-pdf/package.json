@@ -1,0 +1,11 @@
+{
+    "name": "ocr-pdf",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "ocr": "tsx src/index.ts"
+    },
+    "dependencies": {
+        "tsx": "^4.7.0"
+    }
+}
