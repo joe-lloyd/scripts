@@ -14,7 +14,8 @@
     "compress-img:compress-original-and-archive": "npm run compress-img:compress-original && npm run compress-img:archive",
     "remove-bg:process": "cd remove-img-bg && node remove-image-background.js",
     "remove-bg:archive": "cd remove-img-bg && node archive.js",
-    "remove-bg:process-and-archive": "npm run remove-bg:process && npm run remove-bg:archive"
+    "remove-bg:process-and-archive": "npm run remove-bg:process && npm run remove-bg:archive",
+    "mermaid:render": "cd mermaid-to-img && node index.js"
   },
   "author": "",
   "license": "ISC",
@@ -30,6 +31,7 @@
     "@types/node": "^24.2.1",
     "@types/sharp": "^0.31.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "@mermaid-js/mermaid-cli": "^11.12.0"
   }
 }
