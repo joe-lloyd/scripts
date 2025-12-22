@@ -19,3 +19,5 @@ node_modules
 **/**/img.webp
 **/**/*.pdf
 **/**/temp/
+
+ocr-pdf/md/*.md
