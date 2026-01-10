@@ -52,6 +52,7 @@ async function processImages(): Promise<void> {
         ".bmp",
         ".tiff",
         ".webp",
+        ".avif",
       ];
       if (!supportedFormats.includes(ext)) {
         console.log(`Skipping non-image file: ${file}`);

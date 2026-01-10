@@ -1,9 +1,20 @@
 .idea
-**/img-in/*.(jpg|png|webp)
-**/img-out/*.(jpg|png|webp)
-**/in/*.(jpg|png|webp)
-**/out/*.(jpg|png|webp)
-**/img-archive/**/**/*.(jpg|png|webp)
+**/img-in/*.jpg
+**/img-in/*.jpeg
+**/img-in/*.png
+**/img-in/*.webp
+**/img-out/*.jpg
+**/img-out/*.png
+**/img-out/*.webp
+**/in/*.jpg
+**/in/*.png
+**/in/*.webp
+**/out/*.jpg
+**/out/*.png
+**/out/*.webp
+**/img-archive/**/*.jpg
+**/img-archive/**/*.png
+**/img-archive/**/*.webp
 **/u2net.onnx
 
 .DS_STORE
@@ -12,7 +23,12 @@ node_modules
 
 /compress-img/img-archive/**/
 /img-to-pdf/img/*.png
-/remove-bg/img-(in|out)/*.(jpg|png|webp)
+/remove-bg/img-in/*.jpg
+/remove-bg/img-in/*.png
+/remove-bg/img-in/*.webp
+/remove-bg/img-out/*.jpg
+/remove-bg/img-out/*.png
+/remove-bg/img-out/*.webp
 
 **/**/img.png
 **/**/img.jpg
@@ -21,3 +37,8 @@ node_modules
 **/**/temp/
 
 ocr-pdf/md/*.md
+
+**/**/*.rar
+**/**/*.stl
+**/**/*.chitubox
+**/**/*.lys

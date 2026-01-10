@@ -15,6 +15,8 @@
     "remove-bg:process": "cd remove-img-bg && node remove-image-background.js",
     "remove-bg:archive": "cd remove-img-bg && node archive.js",
     "remove-bg:process-and-archive": "npm run remove-bg:process && npm run remove-bg:archive",
+    "unrar:process": "cd unrar-files && npx ts-node --esm unrar.ts",
+    "unrar:task-list": "echo \"- [x] Setup project structure\\n- [x] Create `unrar-files` directory\\n- [x] Create `in` and `out` directories\\n- [x] Implement unrar script\\n- [x] Research/Select extraction library\\n- [x] Write `unrar.ts`\\n- [x] Add npm script to `package.json`\\n- [/] Verify functionality\""
     "mermaid:render": "cd mermaid-to-img && node index.js"
   },
   "author": "",
@@ -23,6 +25,7 @@
     "@imgly/background-removal": "^1.7.0",
     "@imgly/background-removal-node": "^1.4.5",
     "jimp": "^1.6.0",
+    "node-unrar-js": "^2.0.2",
     "onnxruntime-node": "^1.20.1",
     "pdfkit": "^0.16.0",
     "sharp": "^0.33.5"
