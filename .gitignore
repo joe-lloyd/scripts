@@ -38,7 +38,14 @@ node_modules
 
 ocr-pdf/md/*.md
 
+<<<<<<< Updated upstream
 **/**/*.rar
 **/**/*.stl
 **/**/*.chitubox
 **/**/*.lys
+=======
+# get-audio: downloaded binaries (~160 MB) and extracted audio
+get-audio/tools/
+get-audio/out/*
+!get-audio/out/.gitkeep
+>>>>>>> Stashed changes

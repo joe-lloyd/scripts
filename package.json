@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "pdf": "node images-to-pdf/images-to-pdf.js",
+    "pdf": "node img-to-pdf/images-to-pdf.js",
     "img-bg-alpha": "node remove-iamge-background.js",
     "compress-img:compress": "cd compress-img && npx ts-node compress.ts",
     "compress-img:compress-original": "cd compress-img && npx ts-node compress-original-type.ts",

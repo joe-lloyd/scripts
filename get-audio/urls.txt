@@ -1,0 +1,10 @@
+# One URL or local file path per line.
+# Blank lines and lines starting with # are ignored.
+#
+# Run Get-Audio.cmd (or .\Get-Audio.ps1) and every entry below gets
+# its audio pulled into out\, named after the video title.
+#
+# Examples:
+# https://youtu.be/GQjrCYrGDZ8
+# C:\Users\joell\Videos\Recording 2026-07-30 115239.mp4
+
