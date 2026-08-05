@@ -19,10 +19,11 @@ assigned desktop, permanently.
 
 ## Setup (one-time)
 
-1. **Desktop counts.** The 1-screen layout needs 10 desktops on the
-   MacBook screen; the 2-screen layout needs 6 on the MacBook and 7 on
-   the LG. The script checks and tells you exactly how many to add
-   (Mission Control > hover top-right > +).
+1. **Desktop counts.** The script counts existing desktops per screen
+   and creates only what's missing by clicking Mission Control's +
+   button itself (needs Accessibility permission for your terminal).
+   Surplus desktops are left alone and reported; delete unwanted ones
+   in Mission Control (hover the thumbnail, click the x).
 2. **Personal Chrome.** Same-app windows can't be split across desktops,
    so the personal profile (joe.lloyd.22.24@gmail.com) lives in
    **Chrome Beta** (separate bundle id = separate binding):
@@ -50,6 +51,8 @@ change the map, then rerun.
   it; the API breaks on every macOS update.
 - Already-open windows don't teleport when bindings are written; either
   `--relaunch` or let apps pick up their desktop at next launch.
-- Creating/removing desktops has no public API — one-time manual step.
+- Creating desktops has no public API — the script UI-clicks Mission
+  Control's + button. Removing desktops stays manual on purpose (their
+  windows would get shuffled onto neighbours).
 - Finder and 1Password are deliberately unbound so their windows appear
   on whatever desktop you're using.

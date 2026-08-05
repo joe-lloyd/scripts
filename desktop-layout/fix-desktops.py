@@ -14,11 +14,13 @@ Usage:
 """
 
 import argparse
+import ctypes
 import os
 import plistlib
 import subprocess
 import sys
 import time
+from ctypes import Structure, byref, c_double, c_uint32
 
 # --- Layout config -----------------------------------------------------------
 # Desktops are listed left to right. Each entry is a list of app keys that
@@ -87,6 +89,106 @@ RELAUNCH_SKIP = {"com.docker.docker"}
 # -----------------------------------------------------------------------------
 
 
+class CGRect(Structure):
+    _fields_ = [("x", c_double), ("y", c_double), ("w", c_double), ("h", c_double)]
+
+
+def display_bounds():
+    """[{main: bool, minx, maxx}] for every active display, via CoreGraphics."""
+    cg = ctypes.CDLL(
+        "/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics"
+    )
+    cg.CGDisplayBounds.restype = CGRect
+    cg.CGDisplayBounds.argtypes = [c_uint32]
+    ids = (c_uint32 * 16)()
+    cnt = c_uint32()
+    cg.CGGetActiveDisplayList(16, ids, byref(cnt))
+    out = []
+    for i in range(cnt.value):
+        r = cg.CGDisplayBounds(ids[i])
+        out.append(
+            {"main": bool(cg.CGDisplayIsMain(ids[i])), "minx": r.x, "maxx": r.x + r.w}
+        )
+    return out
+
+
+# Clicks Mission Control's "add desktop" button n times, but only the button
+# sitting inside the given x range (= the target display's Spaces bar).
+ADD_DESKTOP_SCRIPT = '''
+on run argv
+    set n to (item 1 of argv) as integer
+    set minX to (item 2 of argv) as integer
+    set maxX to (item 3 of argv) as integer
+    do shell script "open -b com.apple.exposelauncher"
+    delay 1.2
+    tell application "System Events" to tell process "Dock"
+        set target to missing value
+        repeat with e in entire contents
+            try
+                if class of e is button and description of e is "add desktop" then
+                    set bx to item 1 of (position of e)
+                    if bx >= minX and bx < maxX then
+                        set target to e
+                        exit repeat
+                    end if
+                end if
+            end try
+        end repeat
+        if target is missing value then
+            key code 53
+            error "no add-desktop button found in x range " & minX & ".." & maxX
+        end if
+        repeat n times
+            click target
+            delay 0.5
+        end repeat
+    end tell
+    delay 0.3
+    tell application "System Events" to key code 53
+end run
+'''
+
+
+def ensure_desktops(layout, monitors, dry_run):
+    """Create only the missing desktops per screen. Returns True if any
+    were added (caller must re-read the plist)."""
+    displays = display_bounds()
+    mac_display = next((d for d in displays if d["main"]), None)
+    ext_display = next((d for d in displays if not d["main"]), None)
+
+    added = False
+    for screen_key, desktops in layout.items():
+        monitor = next(
+            (m for m in monitors
+             if (m["Display Identifier"] == "Main") == (screen_key == "macbook")),
+            None,
+        )
+        display = mac_display if screen_key == "macbook" else ext_display
+        if monitor is None or display is None:
+            continue
+        have = len(monitor["Spaces"])
+        need = len(desktops)
+        name = "MacBook screen" if screen_key == "macbook" else "external screen"
+        if have >= need:
+            spare = have - need
+            if spare:
+                print(f"{name}: {have} desktops, layout uses {need} - "
+                      f"{spare} spare (unbound; delete in Mission Control if unwanted)")
+            continue
+        deficit = need - have
+        if dry_run:
+            print(f"{name}: {have} desktops, needs {need} - would create {deficit}")
+            continue
+        print(f"{name}: {have} desktops, needs {need} - creating {deficit}...")
+        subprocess.run(
+            ["osascript", "-e", ADD_DESKTOP_SCRIPT, str(deficit),
+             str(int(display["minx"])), str(int(display["maxx"]))],
+            check=True, capture_output=True, text=True,
+        )
+        added = True
+    return added
+
+
 def read_spaces_plist():
     raw = subprocess.run(
         ["defaults", "export", "com.apple.spaces", "-"],
@@ -119,9 +221,9 @@ def build_bindings(layout, monitors):
         if missing > 0:
             name = "MacBook screen" if screen_key == "macbook" else "external screen"
             problems.append(
-                f"{name} has {len(spaces)} desktops but the layout needs "
-                f"{len(desktops)} - add {missing} in Mission Control "
-                f"(swipe up with 3 fingers, hover top-right, click +), then rerun"
+                f"{name} still has {len(spaces)} desktops but the layout needs "
+                f"{len(desktops)} - desktop creation may have failed; check "
+                f"Accessibility permission for your terminal and rerun"
             )
             continue
         for i, app_keys in enumerate(desktops):
@@ -185,6 +287,12 @@ def main():
     layout = TWO_SCREEN if len(monitors) >= 2 else ONE_SCREEN
     mode = "2-screen" if layout is TWO_SCREEN else "1-screen"
     print(f"Detected {len(monitors)} screen(s) -> applying {mode} layout\n")
+
+    # Create only what's missing; existing desktops are counted first.
+    if ensure_desktops(layout, monitors, args.dry_run):
+        time.sleep(1)
+        monitors = live_monitors(read_spaces_plist())
+    print()
 
     bindings, problems = build_bindings(layout, monitors)
     print(describe(layout, bindings), "\n")
