@@ -19,17 +19,23 @@ assigned desktop, permanently.
 
 ## Setup (one-time)
 
-1. **Desktop counts.** The script counts existing desktops per screen
-   and creates only what's missing by clicking Mission Control's +
-   button itself (needs Accessibility permission for your terminal).
-   Surplus desktops are left alone and reported; delete unwanted ones
-   in Mission Control (hover the thumbnail, click the x).
-2. **Personal Chrome.** Same-app windows can't be split across desktops,
+1. **Desktop counts.** The script makes counts match the layout exactly:
+   it creates missing desktops and removes extras from the right (via
+   Mission Control's AX actions — needs Accessibility permission).
+   Windows on removed desktops migrate to a remaining one. Temp desktops
+   you add by hand get trimmed again on the next run.
+2. **One-click button.** Build the Dock app once and drag it to the Dock:
+   ```sh
+   osacompile -o "Fix Desktops.app" FixDesktops.applescript
+   ```
+   First click: approve the System Events prompt and add "Fix Desktops"
+   under System Settings > Privacy & Security > Accessibility.
+3. **Personal Chrome.** Same-app windows can't be split across desktops,
    so the personal profile (joe.lloyd.22.24@gmail.com) lives in
    **Chrome Beta** (separate bundle id = separate binding):
    `brew install --cask google-chrome@beta`, then sign the personal
    profile in there and remove it from regular Chrome.
-3. First `--relaunch` run triggers one macOS permission prompt per app
+4. First `--relaunch` run triggers one macOS permission prompt per app
    ("Terminal wants to control X") — approve once each.
 
 ## Usage

@@ -155,7 +155,8 @@ def live_screens():
 
 
 def display_bounds():
-    """[{main: bool, minx, maxx}] for every active display."""
+    """[{main: bool, minx, maxx, miny, maxy}] for every active display.
+    Displays can be arranged vertically, so matching needs both axes."""
     CG.CGDisplayBounds.restype = CGRect
     CG.CGDisplayBounds.argtypes = [c_uint32]
     ids = (c_uint32 * 16)()
@@ -164,41 +165,71 @@ def display_bounds():
     out = []
     for i in range(cnt.value):
         r = CG.CGDisplayBounds(ids[i])
-        out.append(
-            {"main": bool(CG.CGDisplayIsMain(ids[i])), "minx": r.x, "maxx": r.x + r.w}
-        )
+        out.append({
+            "main": bool(CG.CGDisplayIsMain(ids[i])),
+            "minx": r.x, "maxx": r.x + r.w,
+            "miny": r.y, "maxy": r.y + r.h,
+        })
     return out
 
 
-# Clicks Mission Control's "add desktop" button n times, but only the button
-# sitting inside the given x range (= the target display's Spaces bar).
-ADD_DESKTOP_SCRIPT = '''
+# Makes one display's desktop count exactly targetCount inside Mission
+# Control: clicks "add desktop" when short, performs AXRemoveDesktop on the
+# rightmost desktop when over. The display is picked by its Spaces Bar's x
+# position (= the given display bounds). Fullscreen-app tiles are untouched
+# (only buttons named "Desktop N" count).
+RECONCILE_DESKTOP_SCRIPT = '''
 on run argv
-    set n to (item 1 of argv) as integer
+    set targetCount to (item 1 of argv) as integer
     set minX to (item 2 of argv) as integer
     set maxX to (item 3 of argv) as integer
+    set minY to (item 4 of argv) as integer
+    set maxY to (item 5 of argv) as integer
+
     do shell script "open -b com.apple.exposelauncher"
-    delay 1.2
+    set ok to false
+    repeat 20 times
+        delay 0.4
+        tell application "System Events" to tell process "Dock"
+            if exists group 1 then
+                set ok to true
+                exit repeat
+            end if
+        end tell
+    end repeat
+    if not ok then error "Mission Control did not open"
+
     tell application "System Events" to tell process "Dock"
-        set target to missing value
-        repeat with e in entire contents
+        set sb to missing value
+        set gs to every group of group 1
+        repeat with i from 1 to count of gs
             try
-                if class of e is button and description of e is "add desktop" then
-                    set bx to item 1 of (position of e)
-                    if bx >= minX and bx < maxX then
-                        set target to e
-                        exit repeat
-                    end if
+                set cand to group "Spaces Bar" of item i of gs
+                set p to position of cand
+                set px to item 1 of p
+                set py to item 2 of p
+                if px >= minX and px < maxX and py >= minY and py < maxY then
+                    set sb to cand
+                    exit repeat
                 end if
             end try
         end repeat
-        if target is missing value then
+        if sb is missing value then
             key code 53
-            error "no add-desktop button found in x range " & minX & ".." & maxX
+            error "no Spaces Bar found in rect x " & minX & ".." & maxX & " y " & minY & ".." & maxY
         end if
-        repeat n times
-            click target
-            delay 0.5
+
+        set lst to list 1 of sb
+        repeat 50 times
+            set dbtns to (every button of lst whose name starts with "Desktop ")
+            set c to count of dbtns
+            if c = targetCount then exit repeat
+            if c > targetCount then
+                perform action "AXRemoveDesktop" of (item c of dbtns)
+            else
+                click (first button of sb whose description is "add desktop")
+            end if
+            delay 0.6
         end repeat
     end tell
     delay 0.3
@@ -207,15 +238,16 @@ end run
 '''
 
 
-def ensure_desktops(layout, screens, dry_run):
-    """Create only the missing desktops per screen. Returns True if any
-    were added (caller must re-read SkyLight)."""
+def reconcile_desktops(layout, screens, dry_run):
+    """Make desktop counts match the layout exactly: create missing ones,
+    remove extras from the right. Returns True if anything changed
+    (caller must re-read SkyLight)."""
     displays = display_bounds()
     bounds = {
         "macbook": next((d for d in displays if d["main"]), None),
         "external": next((d for d in displays if not d["main"]), None),
     }
-    added = False
+    changed = False
     for screen_key, desktops in layout.items():
         spaces = screens.get(screen_key)
         display = bounds.get(screen_key)
@@ -223,23 +255,24 @@ def ensure_desktops(layout, screens, dry_run):
             continue
         have, need = len(spaces), len(desktops)
         name = "MacBook screen" if screen_key == "macbook" else "external screen"
-        if have >= need:
-            if have > need:
-                print(f"{name}: {have} desktops, layout uses {need} - "
-                      f"{have - need} spare (unbound; delete in Mission Control if unwanted)")
+        if have == need:
             continue
-        deficit = need - have
+        verb = "create" if have < need else "remove"
+        n = abs(need - have)
         if dry_run:
-            print(f"{name}: {have} desktops, needs {need} - would create {deficit}")
+            print(f"{name}: {have} desktops, layout wants {need} - would {verb} {n}")
             continue
-        print(f"{name}: {have} desktops, needs {need} - creating {deficit}...")
-        subprocess.run(
-            ["osascript", "-e", ADD_DESKTOP_SCRIPT, str(deficit),
-             str(int(display["minx"])), str(int(display["maxx"]))],
-            check=True, capture_output=True, text=True,
+        print(f"{name}: {have} desktops, layout wants {need} - {verb[:-1]}ing {n}...")
+        result = subprocess.run(
+            ["osascript", "-e", RECONCILE_DESKTOP_SCRIPT, str(need),
+             str(int(display["minx"])), str(int(display["maxx"])),
+             str(int(display["miny"])), str(int(display["maxy"]))],
+            capture_output=True, text=True,
         )
-        added = True
-    return added
+        if result.returncode != 0:
+            sys.exit(f"Desktop reconcile failed: {result.stderr.strip()}")
+        changed = True
+    return changed
 
 
 def build_bindings(layout, screens):
@@ -332,8 +365,8 @@ def main():
     mode = "2-screen" if layout is TWO_SCREEN else "1-screen"
     print(f"Detected {len(screens)} screen(s) -> applying {mode} layout\n")
 
-    # Create only what's missing; existing desktops are counted first.
-    if ensure_desktops(layout, screens, args.dry_run):
+    # Make counts exact: create missing desktops, trim extras from the right.
+    if reconcile_desktops(layout, screens, args.dry_run):
         time.sleep(1)
         screens = live_screens()
     print()
