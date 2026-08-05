@@ -24,9 +24,9 @@ find . -name "package-lock.json" -delete
 # rm -f .gitignore .gitmodules .gitattributes
 
 # Remove dev files
-find . -name "*.test.*" -delete
-find . -name "*.spec.*" -delete
-find . -type d -name "__tests__" -prune -exec rm -rf '{}' +
+# find . -name "*.test.*" -delete
+# find . -name "*.spec.*" -delete
+# find . -type d -name "__tests__" -prune -exec rm -rf '{}' +
 find . -name "*.map" -delete
 
 # Remove IDE/editor files
