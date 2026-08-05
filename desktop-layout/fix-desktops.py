@@ -19,7 +19,6 @@ Usage:
 
 import argparse
 import ctypes
-import os
 import plistlib
 import subprocess
 import sys
@@ -88,7 +87,8 @@ TWO_SCREEN = {
 }
 
 # Apps never quit by --relaunch even when bound (data loss / self-kill risk).
-RELAUNCH_SKIP = {"com.docker.docker"}
+# iTerm2 stays: quitting it kills whatever terminal work is running.
+RELAUNCH_SKIP = {"com.docker.docker", "com.googlecode.iterm2"}
 
 # -----------------------------------------------------------------------------
 
@@ -321,25 +321,24 @@ def describe(layout, bindings):
     return "\n".join(lines)
 
 
-def app_running(bundle_id):
-    result = subprocess.run(
-        ["lsappinfo", "find", f"bundleid={bundle_id}"],
+def running_bundle_ids():
+    """lowercased bundle id -> canonical bundle id of running GUI apps.
+    Bindings use lowercase ids (Dock convention) but the OS reports
+    canonical case, and lsappinfo/AppleEvents matching is case-sensitive."""
+    out = subprocess.run(
+        ["osascript", "-e",
+         'tell application "System Events" to get bundle identifier of '
+         'every application process'],
         capture_output=True, text=True,
-    )
-    return bool(result.stdout.strip())
+    ).stdout
+    ids = [s.strip() for s in out.split(",") if s.strip()]
+    return {i.lower(): i for i in ids}
 
 
 def relaunch(bundle_ids):
-    inside_iterm = os.environ.get("TERM_PROGRAM") == "iTerm.app"
-    running = []
-    for bid in bundle_ids:
-        if bid in RELAUNCH_SKIP:
-            continue
-        if inside_iterm and bid == "com.googlecode.iterm2":
-            print("  skipping iTerm2 - the script is running inside it")
-            continue
-        if app_running(bid):
-            running.append(bid)
+    canonical = running_bundle_ids()
+    running = [canonical[bid] for bid in bundle_ids
+               if bid not in RELAUNCH_SKIP and bid in canonical]
 
     for bid in running:
         print(f"  quitting {bid}")
