@@ -5,7 +5,8 @@
   "scripts": {
     "build": "tsc",
     "start": "ts-node --transpile-only src/index.ts",
-    "compress": "npm run start"
+    "compress": "npm run start",
+    "convert": "ts-node --transpile-only src/index.ts convert"
   },
   "keywords": [],
   "author": "",

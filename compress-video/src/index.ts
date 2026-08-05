@@ -76,6 +76,75 @@ const compressVideo = (inputPath: string): Promise<void> => {
   });
 };
 
+// Convert a single video file to MP4
+const convertToMp4 = (inputPath: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const parsedPath = path.parse(inputPath);
+    if (parsedPath.ext.toLowerCase() === '.mp4') {
+      resolve();
+      return;
+    }
+    
+    const outputPath = path.join(OUTPUT_DIR, `${parsedPath.name}.mp4`);
+    
+    if (fs.existsSync(outputPath)) {
+      console.log(`Skipping ${parsedPath.base} - MP4 already exists`);
+      resolve();
+      return;
+    }
+    
+    console.log(`Converting ${parsedPath.base} to MP4 without quality loss...`);
+    
+    ffmpeg(inputPath)
+      .outputOptions([
+        '-c copy' // Copy streams losslessly
+      ])
+      .output(outputPath)
+      .on('error', (err: Error) => {
+        console.error(`Error converting ${parsedPath.base}:`, err.message);
+        reject(err);
+      })
+      .on('end', () => {
+        console.log(`Finished converting ${parsedPath.base} to MP4`);
+        resolve();
+      })
+      .run();
+  });
+};
+
+// Main function to convert all videos to MP4
+const convertVideos = async (): Promise<void> => {
+  let videoFiles: string[] = [];
+  try {
+    videoFiles = fs.readdirSync(OUTPUT_DIR)
+      .filter(file => {
+        const ext = path.extname(file).toLowerCase();
+        return ['.mov', '.avi', '.mkv', '.wmv', '.flv', '.webm'].includes(ext);
+      })
+      .map(file => path.join(OUTPUT_DIR, file));
+  } catch (error) {
+    console.error('Error reading output directory:', error);
+    return;
+  }
+  
+  if (videoFiles.length === 0) {
+    console.log('No video files to convert in the output directory.');
+    return;
+  }
+  
+  console.log(`Found ${videoFiles.length} video file(s) to convert to MP4.`);
+  
+  for (const file of videoFiles) {
+    try {
+      await convertToMp4(file);
+    } catch (error) {
+      console.error(`Failed to process ${path.basename(file)}`);
+    }
+  }
+  
+  console.log('All conversions finished.');
+};
+
 // Main function to process all videos
 const processVideos = async (): Promise<void> => {
   const videoFiles = getVideoFiles();
@@ -99,7 +168,16 @@ const processVideos = async (): Promise<void> => {
 };
 
 // Run the script
-processVideos().catch(err => {
-  console.error('An error occurred:', err);
-  process.exit(1);
-});
+const command = process.argv[2];
+
+if (command === 'convert') {
+  convertVideos().catch(err => {
+    console.error('An error occurred:', err);
+    process.exit(1);
+  });
+} else {
+  processVideos().catch(err => {
+    console.error('An error occurred:', err);
+    process.exit(1);
+  });
+}
