@@ -16,7 +16,7 @@
     "remove-bg:archive": "cd remove-img-bg && node archive.js",
     "remove-bg:process-and-archive": "npm run remove-bg:process && npm run remove-bg:archive",
     "unrar:process": "cd unrar-files && npx ts-node --esm unrar.ts",
-    "unrar:task-list": "echo \"- [x] Setup project structure\\n- [x] Create `unrar-files` directory\\n- [x] Create `in` and `out` directories\\n- [x] Implement unrar script\\n- [x] Research/Select extraction library\\n- [x] Write `unrar.ts`\\n- [x] Add npm script to `package.json`\\n- [/] Verify functionality\""
+    "unrar:task-list": "echo \"- [x] Setup project structure\\n- [x] Create `unrar-files` directory\\n- [x] Create `in` and `out` directories\\n- [x] Implement unrar script\\n- [x] Research/Select extraction library\\n- [x] Write `unrar.ts`\\n- [x] Add npm script to `package.json`\\n- [/] Verify functionality\"",
     "mermaid:render": "cd mermaid-to-img && node index.js"
   },
   "author": "",
