@@ -6,6 +6,10 @@ Options > Assign To Desktop), detects whether the external monitor is
 connected, and applies the matching layout. No SIP changes, no window
 manager, macOS itself enforces the placement at every app launch.
 
+Live desktop lists come from SkyLight's SLSCopyManagedDisplaySpaces —
+the com.apple.spaces defaults plist keeps stale/merged monitor configs
+and cannot be trusted for ordering (learned the hard way).
+
 Usage:
   ./fix-desktops.py            apply bindings for the current display setup
   ./fix-desktops.py --dry-run  show what would be written, change nothing
@@ -20,7 +24,7 @@ import plistlib
 import subprocess
 import sys
 import time
-from ctypes import Structure, byref, c_double, c_uint32
+from ctypes import Structure, byref, c_double, c_int, c_long, c_ulong, c_uint32, c_void_p
 
 # --- Layout config -----------------------------------------------------------
 # Desktops are listed left to right. Each entry is a list of app keys that
@@ -88,26 +92,80 @@ RELAUNCH_SKIP = {"com.docker.docker"}
 
 # -----------------------------------------------------------------------------
 
+CF = ctypes.CDLL("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")
+CG = ctypes.CDLL("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics")
+SKYLIGHT = ctypes.CDLL("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight")
+COLORSYNC = ctypes.CDLL("/System/Library/Frameworks/ColorSync.framework/ColorSync")
+
 
 class CGRect(Structure):
     _fields_ = [("x", c_double), ("y", c_double), ("w", c_double), ("h", c_double)]
 
 
-def display_bounds():
-    """[{main: bool, minx, maxx}] for every active display, via CoreGraphics."""
-    cg = ctypes.CDLL(
-        "/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics"
+def _cf_to_python(cf_ref):
+    """Serialize a CF property list object to bytes and parse with plistlib."""
+    CF.CFPropertyListCreateData.restype = c_void_p
+    CF.CFPropertyListCreateData.argtypes = [c_void_p, c_void_p, c_long, c_ulong, c_void_p]
+    CF.CFDataGetBytePtr.restype = ctypes.POINTER(ctypes.c_ubyte)
+    CF.CFDataGetBytePtr.argtypes = [c_void_p]
+    CF.CFDataGetLength.restype = c_long
+    CF.CFDataGetLength.argtypes = [c_void_p]
+    data = CF.CFPropertyListCreateData(None, cf_ref, 200, 0, None)  # binary v1.0
+    if not data:
+        data = CF.CFPropertyListCreateData(None, cf_ref, 100, 0, None)  # xml
+    if not data:
+        raise RuntimeError("CFPropertyListCreateData failed")
+    raw = ctypes.string_at(CF.CFDataGetBytePtr(data), CF.CFDataGetLength(data))
+    return plistlib.loads(raw)
+
+
+def main_display_uuid():
+    CG.CGMainDisplayID.restype = c_uint32
+    COLORSYNC.CGDisplayCreateUUIDFromDisplayID.restype = c_void_p
+    COLORSYNC.CGDisplayCreateUUIDFromDisplayID.argtypes = [c_uint32]
+    CF.CFUUIDCreateString.restype = c_void_p
+    CF.CFUUIDCreateString.argtypes = [c_void_p, c_void_p]
+    CF.CFStringGetCString.restype = ctypes.c_bool
+    CF.CFStringGetCString.argtypes = [c_void_p, ctypes.c_char_p, c_long, c_uint32]
+    uuid_ref = COLORSYNC.CGDisplayCreateUUIDFromDisplayID(CG.CGMainDisplayID())
+    s = CF.CFUUIDCreateString(None, uuid_ref)
+    buf = ctypes.create_string_buffer(64)
+    CF.CFStringGetCString(s, buf, 64, 0x08000100)  # kCFStringEncodingUTF8
+    return buf.value.decode()
+
+
+def live_screens():
+    """{'macbook': [space uuids...], 'external': [...]} from SkyLight —
+    the actual Mission Control state, in left-to-right desktop order."""
+    SKYLIGHT.SLSMainConnectionID.restype = c_int
+    SKYLIGHT.SLSCopyManagedDisplaySpaces.restype = c_void_p
+    SKYLIGHT.SLSCopyManagedDisplaySpaces.argtypes = [c_int]
+    displays = _cf_to_python(
+        SKYLIGHT.SLSCopyManagedDisplaySpaces(SKYLIGHT.SLSMainConnectionID())
     )
-    cg.CGDisplayBounds.restype = CGRect
-    cg.CGDisplayBounds.argtypes = [c_uint32]
+    main_uuid = main_display_uuid()
+    screens = {}
+    for d in displays:
+        ident = d.get("Display Identifier", "")
+        # user-visible desktops only (type 0 = standard, skips fullscreen apps)
+        spaces = [s["uuid"] for s in d.get("Spaces", []) if s.get("type") == 0]
+        key = "macbook" if ident in (main_uuid, "Main") else "external"
+        screens[key] = spaces
+    return screens
+
+
+def display_bounds():
+    """[{main: bool, minx, maxx}] for every active display."""
+    CG.CGDisplayBounds.restype = CGRect
+    CG.CGDisplayBounds.argtypes = [c_uint32]
     ids = (c_uint32 * 16)()
     cnt = c_uint32()
-    cg.CGGetActiveDisplayList(16, ids, byref(cnt))
+    CG.CGGetActiveDisplayList(16, ids, byref(cnt))
     out = []
     for i in range(cnt.value):
-        r = cg.CGDisplayBounds(ids[i])
+        r = CG.CGDisplayBounds(ids[i])
         out.append(
-            {"main": bool(cg.CGDisplayIsMain(ids[i])), "minx": r.x, "maxx": r.x + r.w}
+            {"main": bool(CG.CGDisplayIsMain(ids[i])), "minx": r.x, "maxx": r.x + r.w}
         )
     return out
 
@@ -149,31 +207,26 @@ end run
 '''
 
 
-def ensure_desktops(layout, monitors, dry_run):
+def ensure_desktops(layout, screens, dry_run):
     """Create only the missing desktops per screen. Returns True if any
-    were added (caller must re-read the plist)."""
+    were added (caller must re-read SkyLight)."""
     displays = display_bounds()
-    mac_display = next((d for d in displays if d["main"]), None)
-    ext_display = next((d for d in displays if not d["main"]), None)
-
+    bounds = {
+        "macbook": next((d for d in displays if d["main"]), None),
+        "external": next((d for d in displays if not d["main"]), None),
+    }
     added = False
     for screen_key, desktops in layout.items():
-        monitor = next(
-            (m for m in monitors
-             if (m["Display Identifier"] == "Main") == (screen_key == "macbook")),
-            None,
-        )
-        display = mac_display if screen_key == "macbook" else ext_display
-        if monitor is None or display is None:
+        spaces = screens.get(screen_key)
+        display = bounds.get(screen_key)
+        if spaces is None or display is None:
             continue
-        have = len(monitor["Spaces"])
-        need = len(desktops)
+        have, need = len(spaces), len(desktops)
         name = "MacBook screen" if screen_key == "macbook" else "external screen"
         if have >= need:
-            spare = have - need
-            if spare:
+            if have > need:
                 print(f"{name}: {have} desktops, layout uses {need} - "
-                      f"{spare} spare (unbound; delete in Mission Control if unwanted)")
+                      f"{have - need} spare (unbound; delete in Mission Control if unwanted)")
             continue
         deficit = need - have
         if dry_run:
@@ -189,36 +242,15 @@ def ensure_desktops(layout, monitors, dry_run):
     return added
 
 
-def read_spaces_plist():
-    raw = subprocess.run(
-        ["defaults", "export", "com.apple.spaces", "-"],
-        capture_output=True, check=True,
-    ).stdout
-    return plistlib.loads(raw)
-
-
-def live_monitors(plist):
-    """Monitors of the *current* display arrangement. Stale arrangements
-    keep a 'Collapsed Space' marker; live ones don't."""
-    monitors = plist["SpacesDisplayConfiguration"]["Management Data"]["Monitors"]
-    return [m for m in monitors if "Collapsed Space" not in m and m.get("Spaces")]
-
-
-def build_bindings(layout, monitors):
-    macbook = next((m for m in monitors if m["Display Identifier"] == "Main"), None)
-    external = next((m for m in monitors if m["Display Identifier"] != "Main"), None)
-    screens = {"macbook": macbook, "external": external}
-
+def build_bindings(layout, screens):
     bindings = {}
     problems = []
     for screen_key, desktops in layout.items():
-        monitor = screens.get(screen_key)
-        if monitor is None:
-            problems.append(f"no live monitor found for '{screen_key}'")
+        spaces = screens.get(screen_key)
+        if spaces is None:
+            problems.append(f"no live display found for '{screen_key}'")
             continue
-        spaces = monitor["Spaces"]
-        missing = len(desktops) - len(spaces)
-        if missing > 0:
+        if len(desktops) > len(spaces):
             name = "MacBook screen" if screen_key == "macbook" else "external screen"
             problems.append(
                 f"{name} still has {len(spaces)} desktops but the layout needs "
@@ -228,8 +260,20 @@ def build_bindings(layout, monitors):
             continue
         for i, app_keys in enumerate(desktops):
             for key in app_keys:
-                bindings[APPS[key]] = spaces[i]["uuid"]
+                bindings[APPS[key]] = spaces[i]
     return bindings, problems
+
+
+def verify_bindings(expected):
+    """Read the bindings back and compare - Dock silently prunes entries
+    it doesn't accept, so trust nothing."""
+    raw = subprocess.run(
+        ["defaults", "export", "com.apple.spaces", "-"],
+        capture_output=True, check=True,
+    ).stdout
+    actual = plistlib.loads(raw).get("app-bindings", {})
+    missing = {k: v for k, v in expected.items() if actual.get(k) != v}
+    return missing
 
 
 def describe(layout, bindings):
@@ -283,18 +327,18 @@ def main():
     parser.add_argument("--relaunch", action="store_true")
     args = parser.parse_args()
 
-    monitors = live_monitors(read_spaces_plist())
-    layout = TWO_SCREEN if len(monitors) >= 2 else ONE_SCREEN
+    screens = live_screens()
+    layout = TWO_SCREEN if "external" in screens else ONE_SCREEN
     mode = "2-screen" if layout is TWO_SCREEN else "1-screen"
-    print(f"Detected {len(monitors)} screen(s) -> applying {mode} layout\n")
+    print(f"Detected {len(screens)} screen(s) -> applying {mode} layout\n")
 
     # Create only what's missing; existing desktops are counted first.
-    if ensure_desktops(layout, monitors, args.dry_run):
+    if ensure_desktops(layout, screens, args.dry_run):
         time.sleep(1)
-        monitors = live_monitors(read_spaces_plist())
+        screens = live_screens()
     print()
 
-    bindings, problems = build_bindings(layout, monitors)
+    bindings, problems = build_bindings(layout, screens)
     print(describe(layout, bindings), "\n")
 
     for p in problems:
@@ -319,7 +363,14 @@ def main():
     )
 
     subprocess.run(["killall", "Dock"], check=True)
-    print("Bindings written, Dock restarted. Apps snap to their desktop at launch.")
+    time.sleep(2)
+
+    missing = verify_bindings(bindings)
+    if missing:
+        print("WARNING: Dock dropped these bindings (app not installed?):")
+        for bid in missing:
+            print(f"  {bid}")
+    print("Bindings written and verified. Apps snap to their desktop at launch.")
 
     if args.relaunch:
         print("\nRelaunching bound apps so they move now:")
