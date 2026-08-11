@@ -1,51 +1,40 @@
+# --- Editors / OS ---
 .idea
-**/img-in/*.jpg
-**/img-in/*.jpeg
-**/img-in/*.png
-**/img-in/*.webp
-**/img-out/*.jpg
-**/img-out/*.png
-**/img-out/*.webp
-**/in/*.jpg
-**/in/*.png
-**/in/*.webp
-**/out/*.jpg
-**/out/*.png
-**/out/*.webp
-**/img-archive/**/*.jpg
-**/img-archive/**/*.png
-**/img-archive/**/*.webp
-**/u2net.onnx
-
+.DS_Store
 .DS_STORE
 
+# --- Dependencies / build output ---
 node_modules
+dist
 
-/compress-img/img-archive/**/
-/img-to-pdf/img/*.png
-/remove-bg/img-in/*.jpg
-/remove-bg/img-in/*.png
-/remove-bg/img-in/*.webp
-/remove-bg/img-out/*.jpg
-/remove-bg/img-out/*.png
-/remove-bg/img-out/*.webp
+# --- Tool work dirs: contents are user data, never tracked ---
+# Every tool uses in/ (drop files here), out/ (results), archive/ (archived runs),
+# and temp/ (scratch). Only the .gitkeep placeholders are tracked.
+**/in/*
+!**/in/.gitkeep
+**/out/*
+!**/out/.gitkeep
+**/archive/
+**/temp/
 
-**/**/img.png
-**/**/img.jpg
-**/**/img.webp
-**/**/*.pdf
-**/**/temp/
+# Legacy dir names (pre-standardization archives that may still exist on disk)
+**/img-in/
+**/img-out/
+**/img-archive/
 
-ocr-pdf/md/*.md
+# --- Large / generated file types ---
+**/*.pdf
+**/*.rar
+**/*.stl
+**/*.chitubox
+**/*.lys
+**/u2net.onnx
 
-<<<<<<< Updated upstream
-**/**/*.rar
-**/**/*.stl
-**/**/*.chitubox
-**/**/*.lys
-=======
-# get-audio: downloaded binaries (~160 MB) and extracted audio
+# --- ocr-pdf: generated markdown ---
+ocr-pdf/md/*
+!ocr-pdf/md/.gitkeep
+
+# --- Downloaded binaries (ffmpeg, yt-dlp) - never tracked ---
+# Shared across all tools; populated by `npm run setup:ffmpeg`
+tools/
 get-audio/tools/
-get-audio/out/*
-!get-audio/out/.gitkeep
->>>>>>> Stashed changes

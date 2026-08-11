@@ -4,8 +4,10 @@ set -euo pipefail
 REPO_URL="https://experience-spaces.googlesource.com/apps/Boba2"
 MAIN_BRANCH="main"  # change this if your main branch is called differently
 
+git show-ref --verify --quiet "refs/heads/$MAIN_BRANCH" || { echo "❌ Local branch '$MAIN_BRANCH' not found." >&2; exit 1; }
+
 echo "📡 Listing all Gerrit change refs from ${REPO_URL}..."
-git ls-remote "${REPO_URL}" | grep "refs/changes/" | grep -v "/meta$" | while read -r sha ref; do
+git ls-remote "${REPO_URL}" | { grep "refs/changes/" || true; } | { grep -v "/meta$" || true; } | while read -r sha ref; do
   change_num=$(echo "$ref" | awk -F'/' '{print $(NF-1)}')
   patch_num=$(echo "$ref" | awk -F'/' '{print $NF}')
   branch="cr-${change_num}-${patch_num}"
@@ -14,19 +16,25 @@ git ls-remote "${REPO_URL}" | grep "refs/changes/" | grep -v "/meta$" | while re
     echo "⏩ ${branch} already exists, skipping"
   else
     echo "⬇️  Fetching ${branch} (${ref})"
-    git fetch "${REPO_URL}" "${ref}" && git branch "${branch}" FETCH_HEAD
+    if git fetch "${REPO_URL}" "${ref}"; then
+      git branch "${branch}" FETCH_HEAD
+    else
+      echo "⚠️  Failed to fetch ${ref}, skipping" >&2
+    fi
   fi
 done
 
 echo "🧹 Cleaning up old patch branches..."
+
 # Delete branches that are already merged into main
-git branch --merged "$MAIN_BRANCH" | grep '^  cr-' | while read -r merged_branch; do
+# (-d is safe here: we just verified these branches are merged)
+git branch --merged "$MAIN_BRANCH" | { grep '^  cr-' || true; } | while read -r merged_branch; do
   echo "🗑️  Deleting merged branch: $merged_branch"
-  git branch -D "$merged_branch"
+  git branch -d "$merged_branch"
 done
 
 # Delete older patch branches, keeping only the latest per CR
-branches=$(git for-each-ref --format='%(refname:short)' refs/heads/cr-* || true)
+branches=$(git for-each-ref --format='%(refname:short)' 'refs/heads/cr-*' || true)
 echo "$branches" | awk -F'-' '
 {
   cr = $2; patch = $3;

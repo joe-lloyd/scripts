@@ -6,7 +6,7 @@
 #
 # Usage:
 #   ./add-spare-desktops.sh --list        show the + buttons and their screen positions
-#   ./add-spare-desktops.sh 4             add 4 desktops on display 1 (leftmost + button)
+#   ./add-spare-desktops.sh 4             add 4 desktops on display 1 (+ buttons sorted top-to-bottom, then left-to-right)
 #   ./add-spare-desktops.sh 4 2           add 4 desktops on display 2
 
 set -euo pipefail
@@ -14,7 +14,12 @@ set -euo pipefail
 MODE="${1:-}"
 [ -z "$MODE" ] && { sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
 
-if [ "$MODE" = "--list" ]; then N=0; LIST=1; else N="$MODE"; LIST=0; fi
+if [ "$MODE" = "--list" ]; then
+    N=0; LIST=1
+else
+    [[ "$MODE" =~ ^[0-9]+$ ]] || { echo "N must be a number" >&2; exit 1; }
+    N="$MODE"; LIST=0
+fi
 DISPLAY_IDX="${2:-1}"
 
 osascript - "$N" "$DISPLAY_IDX" "$LIST" <<'APPLESCRIPT'
@@ -44,18 +49,20 @@ on run argv
             error "No 'add desktop' button found - Mission Control layout may differ; run --list and send me the output"
         end if
 
-        -- sort buttons left-to-right by x position so displayIdx is stable
+        -- sort buttons by (y, x) so displayIdx is stable: displays stacked
+        -- vertically share the same x, so x alone cannot order them
         set sorted to {}
         repeat with b in addBtns
             set pos to position of b
-            set end of sorted to {x:(item 1 of pos), btn:b}
+            set end of sorted to {x:(item 1 of pos), y:(item 2 of pos), btn:b}
         end repeat
         repeat with i from 1 to (count of sorted) - 1
             repeat with j from 1 to (count of sorted) - i
-                if x of item j of sorted > x of item (j + 1) of sorted then
-                    set tmp to item j of sorted
-                    set item j of sorted to item (j + 1) of sorted
-                    set item (j + 1) of sorted to tmp
+                set ra to item j of sorted
+                set rb to item (j + 1) of sorted
+                if (y of ra > y of rb) or (y of ra = y of rb and x of ra > x of rb) then
+                    set item j of sorted to rb
+                    set item (j + 1) of sorted to ra
                 end if
             end repeat
         end repeat
@@ -63,7 +70,7 @@ on run argv
         if listOnly is 1 then
             set out to ""
             repeat with i from 1 to count of sorted
-                set out to out & "display " & i & ": + button at x=" & (x of item i of sorted) & linefeed
+                set out to out & "display " & i & ": + button at x=" & (x of item i of sorted) & " y=" & (y of item i of sorted) & linefeed
             end repeat
             key code 53
             return out

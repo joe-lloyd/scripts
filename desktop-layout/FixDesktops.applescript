@@ -5,9 +5,9 @@
 -- System Settings > Privacy & Security > Accessibility.
 
 on run
-    set scriptPath to "/Users/joelloyd/Projects/MyProjects/scripts/desktop-layout/fix-desktops.py"
     try
-        do shell script "/usr/bin/python3 " & quoted form of scriptPath & " --relaunch"
+        -- $HOME expands in the shell, so this works for any user name
+        do shell script "/usr/bin/python3 \"$HOME/Projects/MyProjects/scripts/desktop-layout/fix-desktops.py\" --relaunch"
         display notification "Desktop layout applied, apps moved" with title "Fix Desktops"
     on error errMsg
         if errMsg contains "assistive access" then

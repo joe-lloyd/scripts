@@ -1,6 +1,13 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # macOS Desktop & App Organizer
-# This script launches apps and moves them to assigned desktops using keyboard shortcuts
+# This script switches to each assigned desktop first, then launches the apps
+# there using keyboard shortcuts.
+#
+# KNOWN LIMITATION: with "Displays have separate Spaces" enabled, desktop
+# numbering (Control+1..N) is global across displays, so phase 2 (secondary
+# display) placement is unreliable. desktop-layout/fix-desktops.py is the
+# newer, more reliable tool for arranging desktops.
+set -euo pipefail
 
 echo "🖥️  macOS Desktop Organizer"
 echo "=========================="
@@ -52,27 +59,30 @@ DESKTOP_4_DISPLAY_2=(
 
 DESKTOP_5_DISPLAY_2=()  # Empty desktop
 
-# Function to launch app and move to desktop
+# Function to switch to a desktop, then launch the app on it
 launch_and_move() {
     local app_name=$1
     local desktop_num=$2
-    
-    echo "📱 Launching $app_name and moving to Desktop $desktop_num..."
-    
-    # Launch the app
-    open -a "$app_name" 2>/dev/null
-    
-    if [ $? -ne 0 ]; then
-        echo "   ⚠️  Warning: Could not find app '$app_name'"
-        return
+
+    echo "📱 Switching to Desktop $desktop_num and launching $app_name..."
+
+    # Switch to the target desktop FIRST (Control + Desktop Number) so the
+    # app's window appears on that desktop when it opens
+    if ! osascript -e "tell application \"System Events\" to keystroke \"$desktop_num\" using control down"; then
+        echo "   ⚠️  Could not send the desktop-switch keystroke." >&2
+        echo "   Grant your terminal Accessibility access in System Settings > Privacy & Security > Accessibility." >&2
+        return 0
     fi
-    
-    sleep 1.5
-    
-    # Move to specified desktop using Control + Desktop Number
-    osascript -e "tell application \"System Events\" to keystroke \"$desktop_num\" using control down" 2>/dev/null
-    
+
     sleep 0.5
+
+    # Launch the app on the now-active desktop
+    if ! open -a "$app_name" 2>/dev/null; then
+        echo "   ⚠️  Warning: Could not find app '$app_name'" >&2
+        return 0
+    fi
+
+    sleep 1.5
 }
 
 # Main execution
@@ -88,7 +98,7 @@ echo "  • Google Chrome will need separate profiles for personal/work logins"
 echo "  • Create Chrome profiles: Chrome Menu > Profiles > Add"
 echo "  • You may need to manually move the second Chrome instance to the secondary display"
 echo ""
-read -p "Press Enter to continue..."
+read -r -p "Press Enter to continue..."
 echo ""
 
 # Process Main Display
@@ -129,7 +139,7 @@ done
 echo ""
 echo "🖥️  Now setting up Secondary Display..."
 echo "   Please move your mouse to the secondary display"
-read -p "   Press Enter when ready..."
+read -r -p "   Press Enter when ready..."
 echo ""
 
 echo "📂 Desktop 1 (Secondary) - Figma"
@@ -153,12 +163,10 @@ for app in "${DESKTOP_4_DISPLAY_2[@]}"; do
     launch_and_move "$app" "4"
 done
 
-if [ ${#DESKTOP_5_DISPLAY_2[@]} -gt 0 ]; then
-    echo "📂 Desktop 5 (Secondary) - Empty"
-    for app in "${DESKTOP_5_DISPLAY_2[@]}"; do
-        launch_and_move "$app" "5"
-    done
-fi
+echo "📂 Desktop 5 (Secondary) - Empty"
+for app in ${DESKTOP_5_DISPLAY_2[@]+"${DESKTOP_5_DISPLAY_2[@]}"}; do
+    launch_and_move "$app" "5"
+done
 
 echo ""
 echo "✅ Desktop organization complete!"

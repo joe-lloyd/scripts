@@ -2,37 +2,18 @@
 
 A simple TypeScript utility to compress video files for easier uploading.
 
-## Prerequisites
+## Requirements
 
-- [Node.js](https://nodejs.org/) (v14 or newer recommended)
-- [FFmpeg](https://ffmpeg.org/) installed on your system
+ffmpeg. Run `npm install` at the repo root and you already have it — prebuilt
+binaries for Windows, macOS and Linux come with the install. If that was skipped
+or failed, run `npm run setup:ffmpeg`, which reports what it found and fetches a
+copy if needed. A system ffmpeg on your PATH is used in preference when present.
 
-### Installing FFmpeg
-
-#### macOS
-```bash
-brew install ffmpeg
-```
-
-#### Windows
-1. Download from [FFmpeg official website](https://ffmpeg.org/download.html)
-2. Add FFmpeg to your PATH environment variable
-
-#### Linux
-```bash
-sudo apt update
-sudo apt install ffmpeg
-```
-
-## Installation
-
-1. Clone this repository
-2. Install dependencies:
-```bash
-npm install
-```
+Then run `npm install` inside this folder for its own dependencies.
 
 ## Usage
+
+### Compress
 
 1. Place your video files in the `in` folder
 2. Run the compression script:
@@ -40,6 +21,23 @@ npm install
 npm run compress
 ```
 3. Compressed videos will be saved to the `out` folder
+
+Output is **always MP4**: whatever the input container (`.mov`, `.mkv`, `.webm`, ...), the result is saved as `<name>.mp4` because the video/audio streams are re-encoded to H.264/AAC.
+
+### Convert (lossless remux)
+
+To repackage non-MP4 files from the `in` folder into MP4 **without re-encoding** (no quality loss, much faster than compressing):
+
+```bash
+npm run convert
+```
+
+This copies the existing video/audio streams into an MP4 container and writes `<name>.mp4` to the `out` folder. Note: it only works when the source streams are MP4-compatible (e.g. H.264/AAC in a `.mkv` or `.mov`); otherwise use `npm run compress`.
+
+### Notes
+
+- Files whose `<name>.mp4` already exists in `out` are skipped, so you can re-run the script to resume a batch.
+- Encodes are written to a `.mp4.part` file and renamed only on success, so an interrupted or failed run never leaves a half-written file that would be mistaken for a finished one.
 
 ## How it works
 

@@ -119,19 +119,54 @@ def _cf_to_python(cf_ref):
     return plistlib.loads(raw)
 
 
-def main_display_uuid():
-    CG.CGMainDisplayID.restype = c_uint32
+def _display_uuid(display_id):
+    """UUID string for a CGDirectDisplayID, or None."""
     COLORSYNC.CGDisplayCreateUUIDFromDisplayID.restype = c_void_p
     COLORSYNC.CGDisplayCreateUUIDFromDisplayID.argtypes = [c_uint32]
     CF.CFUUIDCreateString.restype = c_void_p
     CF.CFUUIDCreateString.argtypes = [c_void_p, c_void_p]
     CF.CFStringGetCString.restype = ctypes.c_bool
     CF.CFStringGetCString.argtypes = [c_void_p, ctypes.c_char_p, c_long, c_uint32]
-    uuid_ref = COLORSYNC.CGDisplayCreateUUIDFromDisplayID(CG.CGMainDisplayID())
+    uuid_ref = COLORSYNC.CGDisplayCreateUUIDFromDisplayID(display_id)
+    if not uuid_ref:
+        return None
     s = CF.CFUUIDCreateString(None, uuid_ref)
     buf = ctypes.create_string_buffer(64)
     CF.CFStringGetCString(s, buf, 64, 0x08000100)  # kCFStringEncodingUTF8
     return buf.value.decode()
+
+
+def _active_display_ids():
+    ids = (c_uint32 * 16)()
+    cnt = c_uint32()
+    CG.CGGetActiveDisplayList(16, ids, byref(cnt))
+    return [ids[i] for i in range(cnt.value)]
+
+
+def macbook_display_id():
+    """CGDirectDisplayID of the built-in panel, via CGDisplayIsBuiltin.
+
+    Keying "macbook" off the MAIN display is wrong whenever the external
+    monitor is set as primary, so ask which panel is physically built in.
+    Falls back to the main display only if the symbol is unavailable.
+    Returns None when no built-in panel is active (clamshell mode) -
+    every live display is then treated as "external"."""
+    try:
+        CG.CGDisplayIsBuiltin.restype = c_int
+        CG.CGDisplayIsBuiltin.argtypes = [c_uint32]
+    except AttributeError:
+        CG.CGMainDisplayID.restype = c_uint32
+        return CG.CGMainDisplayID()
+    for did in _active_display_ids():
+        if CG.CGDisplayIsBuiltin(did):
+            return did
+    return None
+
+
+def macbook_display_uuid():
+    """UUID of the display to treat as 'macbook', or None (clamshell)."""
+    did = macbook_display_id()
+    return _display_uuid(did) if did is not None else None
 
 
 def live_screens():
@@ -143,30 +178,35 @@ def live_screens():
     displays = _cf_to_python(
         SKYLIGHT.SLSCopyManagedDisplaySpaces(SKYLIGHT.SLSMainConnectionID())
     )
-    main_uuid = main_display_uuid()
+    mb_uuid = macbook_display_uuid()
     screens = {}
     for d in displays:
         ident = d.get("Display Identifier", "")
         # user-visible desktops only (type 0 = standard, skips fullscreen apps)
         spaces = [s["uuid"] for s in d.get("Spaces", []) if s.get("type") == 0]
-        key = "macbook" if ident in (main_uuid, "Main") else "external"
+        # "Main" is what SkyLight reports for a lone display; only trust it
+        # as the MacBook panel when a built-in panel is actually active.
+        if mb_uuid is not None and ident in (mb_uuid, "Main"):
+            key = "macbook"
+        else:
+            key = "external"
         screens[key] = spaces
     return screens
 
 
 def display_bounds():
-    """[{main: bool, minx, maxx, miny, maxy}] for every active display.
-    Displays can be arranged vertically, so matching needs both axes."""
+    """[{macbook: bool, minx, maxx, miny, maxy}] for every active display.
+    Displays can be arranged vertically, so matching needs both axes.
+    Keyed by the built-in panel (same test as live_screens), not by which
+    display is main."""
     CG.CGDisplayBounds.restype = CGRect
     CG.CGDisplayBounds.argtypes = [c_uint32]
-    ids = (c_uint32 * 16)()
-    cnt = c_uint32()
-    CG.CGGetActiveDisplayList(16, ids, byref(cnt))
+    mb_id = macbook_display_id()
     out = []
-    for i in range(cnt.value):
-        r = CG.CGDisplayBounds(ids[i])
+    for did in _active_display_ids():
+        r = CG.CGDisplayBounds(did)
         out.append({
-            "main": bool(CG.CGDisplayIsMain(ids[i])),
+            "macbook": mb_id is not None and did == mb_id,
             "minx": r.x, "maxx": r.x + r.w,
             "miny": r.y, "maxy": r.y + r.h,
         })
@@ -178,6 +218,8 @@ def display_bounds():
 # rightmost desktop when over. The display is picked by its Spaces Bar's x
 # position (= the given display bounds). Fullscreen-app tiles are untouched
 # (only buttons named "Desktop N" count).
+# NOTE: matches AX element names ("Desktop N", "add desktop", "Spaces Bar"),
+# so it requires the macOS UI language to be English.
 RECONCILE_DESKTOP_SCRIPT = '''
 on run argv
     set targetCount to (item 1 of argv) as integer
@@ -244,8 +286,8 @@ def reconcile_desktops(layout, screens, dry_run):
     (caller must re-read SkyLight)."""
     displays = display_bounds()
     bounds = {
-        "macbook": next((d for d in displays if d["main"]), None),
-        "external": next((d for d in displays if not d["main"]), None),
+        "macbook": next((d for d in displays if d["macbook"]), None),
+        "external": next((d for d in displays if not d["macbook"]), None),
     }
     changed = False
     for screen_key, desktops in layout.items():
@@ -346,7 +388,16 @@ def relaunch(bundle_ids):
             ["osascript", "-e", f'tell application id "{bid}" to quit'],
             capture_output=True,
         )
-    time.sleep(5)
+    # Wait until the quits actually land (apps flush state, show save
+    # sheets, etc). Reopening too early just refocuses the old instance
+    # on the old desktop, so poll instead of a blind sleep.
+    deadline = time.time() + 15
+    waiting = {bid.lower() for bid in running}
+    while waiting and time.time() < deadline:
+        time.sleep(0.5)
+        waiting &= set(running_bundle_ids())
+    if waiting:
+        print(f"  still running after 15s: {', '.join(sorted(waiting))}")
     for bid in running:
         print(f"  reopening {bid}")
         subprocess.run(["open", "-b", bid], capture_output=True)

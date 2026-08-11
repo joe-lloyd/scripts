@@ -7,48 +7,53 @@ CONFIG_FILE="${SCRIPT_DIR}/config.env"
 
 # Load configuration
 if [[ ! -f "$CONFIG_FILE" ]]; then
-  echo "❌ Config file not found at $CONFIG_FILE"
+  echo "❌ Config file not found at $CONFIG_FILE" >&2
   exit 1
 fi
 # shellcheck disable=SC1090
 source "$CONFIG_FILE"
 
 if [[ -z "${REPO_URL:-}" ]]; then
-  echo "❌ REPO_URL not defined in config"
+  echo "❌ REPO_URL not defined in config" >&2
   exit 1
 fi
 
 if [[ -z "${AFTER_DATE:-}" ]]; then
-  echo "❌ AFTER_DATE not defined in config"
+  echo "❌ AFTER_DATE not defined in config" >&2
   exit 1
 fi
 
+# Compute the cutoff epoch once (GNU date first, BSD/macOS fallback)
+AFTER_EPOCH=$(date -d "$AFTER_DATE" +%s 2>/dev/null || date -j -f %Y-%m-%d "$AFTER_DATE" +%s)
+
 echo "📡 Listing all Gerrit change refs from ${REPO_URL}..."
 
-git ls-remote "${REPO_URL}" | grep "refs/changes/" | grep -v "/meta$" | while read -r sha ref; do
-  # Get commit date
-  commit_date=$(git ls-remote "${REPO_URL}" "${ref}" | awk '{print $1}' | xargs -I {} git show -s --format=%ci {} 2>/dev/null || echo "")
-
-  # Skip if no date found
-  if [[ -z "$commit_date" ]]; then
-    continue
-  fi
-
-  # Compare commit date to AFTER_DATE
-  if [[ $(date -d "$commit_date" +%s) -lt $(date -d "$AFTER_DATE" +%s) ]]; then
-    continue
-  fi
-
+git ls-remote "${REPO_URL}" | { grep "refs/changes/" || true; } | { grep -v "/meta$" || true; } | while read -r sha ref; do
   change_num=$(echo "$ref" | awk -F'/' '{print $(NF-1)}')
   patch_num=$(echo "$ref" | awk -F'/' '{print $NF}')
   branch="cr-${change_num}-${patch_num}"
 
   if git show-ref --verify --quiet "refs/heads/${branch}"; then
     echo "⏩ ${branch} already exists, skipping"
-  else
-    echo "⬇️  Fetching ${branch} (${ref})"
-    git fetch "${REPO_URL}" "${ref}" && git branch "${branch}" FETCH_HEAD
+    continue
   fi
+
+  # Fetch the ref FIRST: we cannot read a commit's date before its object
+  # exists locally.
+  echo "⬇️  Fetching ${branch} (${ref})"
+  if ! git fetch "${REPO_URL}" "${ref}"; then
+    echo "⚠️  Failed to fetch ${ref}, skipping" >&2
+    continue
+  fi
+
+  # Skip changes older than AFTER_DATE
+  commit_epoch=$(git show -s --format=%ct FETCH_HEAD)
+  if [[ "$commit_epoch" -lt "$AFTER_EPOCH" ]]; then
+    echo "⏩ ${branch} is older than ${AFTER_DATE}, skipping"
+    continue
+  fi
+
+  git branch "${branch}" FETCH_HEAD
 done
 
 echo "✅ All recent change refs (after ${AFTER_DATE}) have been fetched locally."

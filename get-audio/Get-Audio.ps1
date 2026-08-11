@@ -48,6 +48,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Windows PowerShell 5.1 decodes child-process stdout with the OEM codepage,
+# which mangles non-ASCII titles coming back from yt-dlp. Force UTF-8 (and
+# pass --encoding utf-8 to yt-dlp below so both sides agree).
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
+
 $root = $PSScriptRoot
 . (Join-Path $root 'lib\Install-Tools.ps1')
 
@@ -112,7 +118,7 @@ foreach ($u in $Url) {
 
     try {
         if ($u -match '^https?://') {
-            $title = (& $tools.YtDlp --no-warnings --print "%(title)s" $u 2>$null | Select-Object -First 1)
+            $title = (& $tools.YtDlp --no-warnings --encoding utf-8 --print "%(title)s" $u 2>$null | Select-Object -First 1)
             if (-not $title) { $title = "audio" }
             Write-Host "  title: $title"
 
@@ -124,10 +130,15 @@ foreach ($u in $Url) {
             # format costs a codec generation and buys nothing. Take the stream
             # as-is and let ffmpeg decode it straight to PCM below.
             # --ffmpeg-location matters: yt-dlp does not inherit PATH here.
-            & $tools.YtDlp -f "bestaudio/best" `
-                           --ffmpeg-location (Split-Path $tools.Ffmpeg) `
-                           -o (Join-Path $tmp 'src.%(ext)s') --no-playlist --no-warnings $u 2>&1 |
-                Where-Object { $_ -match 'ERROR|\[download\]\s+100%' } | ForEach-Object { "    $_" }
+            $dlOut = & $tools.YtDlp -f "bestaudio/best" `
+                                    --ffmpeg-location (Split-Path $tools.Ffmpeg) `
+                                    --encoding utf-8 `
+                                    -o (Join-Path $tmp 'src.%(ext)s') --no-playlist --no-warnings $u 2>&1
+            $dlOut | Where-Object { $_ -match 'ERROR|\[download\]\s+100%' } | ForEach-Object { "    $_" }
+            if ($LASTEXITCODE -ne 0) {
+                $tail = (@($dlOut | Select-Object -Last 10) | ForEach-Object { "$_" }) -join "`n"
+                throw "yt-dlp failed (exit $LASTEXITCODE):`n$tail"
+            }
 
             $got = Get-ChildItem -LiteralPath $tmp -File | Select-Object -First 1
             if (-not $got) { throw "download produced no file" }
@@ -191,7 +202,14 @@ foreach ($u in $Url) {
         if ($Mono) { $ffArgs += @('-ac','1') }
         $ffArgs += $dest
 
-        & $tools.Ffmpeg @ffArgs 2>&1 | Out-Null
+        # ffmpeg with -y creates $dest before encoding, so the file existing
+        # proves nothing -- trust the exit code and clean up any partial file.
+        $ffOut = & $tools.Ffmpeg @ffArgs 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Remove-Item -LiteralPath $dest -ErrorAction SilentlyContinue
+            $tail = (@($ffOut | Select-Object -Last 10) | ForEach-Object { "$_" }) -join "`n"
+            throw "ffmpeg failed (exit $LASTEXITCODE):`n$tail"
+        }
         if (-not (Test-Path -LiteralPath $dest)) { throw "ffmpeg produced no output" }
 
         $f = Get-Item -LiteralPath $dest

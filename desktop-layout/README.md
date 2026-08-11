@@ -10,12 +10,15 @@ assigned desktop, permanently.
 - Writes native `com.apple.spaces` app-bindings — the same thing as
   right-clicking a Dock icon > Options > Assign To Desktop, but for the
   whole map at once.
-- Detects the current display setup from the Spaces plist (stale monitor
-  configs carry a `Collapsed Space` marker, live ones don't).
+- Reads the live desktop list per display from SkyLight's
+  `SLSCopyManagedDisplaySpaces` — the `com.apple.spaces` plist keeps
+  stale/merged monitor configs around and can't be trusted for ordering.
 - Disables "Automatically rearrange Spaces based on most recent use"
   (`com.apple.dock mru-spaces`) so the desktop order stays fixed.
-- Restarts the Dock to apply. No SIP changes, no private APIs, no window
-  manager — survives reboots and macOS updates.
+- Restarts the Dock to apply. No SIP changes, no window manager. One
+  private framework is used — SkyLight, read-only, just to list the
+  current Spaces; all writes go through plain `defaults`. Survives
+  reboots and macOS updates.
 
 ## Setup (one-time)
 
@@ -49,6 +52,15 @@ assigned desktop, permanently.
 Edit the `ONE_SCREEN` / `TWO_SCREEN` tables at the top of the script to
 change the map, then rerun.
 
+## Helper scripts
+
+- `add-spare-desktops.sh N [display]` — add N temporary desktops by
+  clicking Mission Control's "+" button (`--list` shows the buttons per
+  display). Note: the main script trims spares again on its next run.
+- `count-windows.swift` — count real windows per app across all Spaces
+  (`swift count-windows.swift`, no permissions needed); handy when
+  deciding which apps can share a desktop.
+
 ## Limitations (macOS, not the script)
 
 - Bindings are per app, not per window: all VS Code windows share one
@@ -57,8 +69,11 @@ change the map, then rerun.
   it; the API breaks on every macOS update.
 - Already-open windows don't teleport when bindings are written; either
   `--relaunch` or let apps pick up their desktop at next launch.
-- Creating desktops has no public API — the script UI-clicks Mission
-  Control's + button. Removing desktops stays manual on purpose (their
-  windows would get shuffled onto neighbours).
+- Creating and removing desktops has no public API — the script
+  UI-scripts Mission Control instead: it clicks the + button to add
+  missing desktops and performs `AXRemoveDesktop` to trim extras from
+  the right (windows on a removed desktop migrate to a neighbour).
+  Matches English AX labels ("Desktop N"), so it needs an
+  English-language macOS UI.
 - Finder and 1Password are deliberately unbound so their windows appear
   on whatever desktop you're using.

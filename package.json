@@ -1,40 +1,47 @@
 {
   "name": "scripts",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Personal collection of small batch utility scripts: images, video, audio, PDFs, and git helpers. Each tool lives in its own folder and follows the in/ -> out/ convention.",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "pdf": "node img-to-pdf/images-to-pdf.js",
-    "img-bg-alpha": "node remove-iamge-background.js",
+    "setup:ffmpeg": "node lib/setup-ffmpeg.js",
     "compress-img:compress": "cd compress-img && npx ts-node compress.ts",
     "compress-img:compress-original": "cd compress-img && npx ts-node compress-original-type.ts",
-    "compress-img:archive": "cd compress-img && npx ts-node archive.ts",
+    "compress-img:archive": "node lib/archive.js compress-img",
     "compress-img:compress-and-archive": "npm run compress-img:compress && npm run compress-img:archive",
     "compress-img:compress-original-and-archive": "npm run compress-img:compress-original && npm run compress-img:archive",
-    "remove-bg:process": "cd remove-img-bg && node remove-image-background.js",
-    "remove-bg:archive": "cd remove-img-bg && node archive.js",
-    "remove-bg:process-and-archive": "npm run remove-bg:process && npm run remove-bg:archive",
-    "unrar:process": "cd unrar-files && npx ts-node --esm unrar.ts",
-    "unrar:task-list": "echo \"- [x] Setup project structure\\n- [x] Create `unrar-files` directory\\n- [x] Create `in` and `out` directories\\n- [x] Implement unrar script\\n- [x] Research/Select extraction library\\n- [x] Write `unrar.ts`\\n- [x] Add npm script to `package.json`\\n- [/] Verify functionality\"",
-    "mermaid:render": "cd mermaid-to-img && node index.js"
+    "compress-video:compress": "npm --prefix compress-video run compress",
+    "compress-video:convert": "npm --prefix compress-video run convert",
+    "convert-img:convert": "node convert-img/index.js",
+    "dedupe-files:scan": "node dedupe-files/index.js",
+    "extract-audio:extract": "node extract-audio/index.js",
+    "img-to-pdf:convert": "node img-to-pdf/images-to-pdf.js",
+    "mermaid-to-img:render": "node mermaid-to-img/index.js",
+    "ocr-pdf:ocr": "npm --prefix ocr-pdf run ocr",
+    "ocr-pdf:md": "npm --prefix ocr-pdf run md",
+    "remove-img-bg:process": "node remove-img-bg/remove-image-background.js",
+    "remove-img-bg:archive": "node lib/archive.js remove-img-bg",
+    "remove-img-bg:process-and-archive": "npm run remove-img-bg:process && npm run remove-img-bg:archive",
+    "resize-img:resize": "node resize-img/index.js",
+    "strip-exif:strip": "node strip-exif/index.js",
+    "unrar-files:extract": "cd unrar-files && npx ts-node unrar.ts",
+    "video-to-gif:convert": "node video-to-gif/index.js"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@imgly/background-removal": "^1.7.0",
     "@imgly/background-removal-node": "^1.4.5",
-    "jimp": "^1.6.0",
     "node-unrar-js": "^2.0.2",
-    "onnxruntime-node": "^1.20.1",
     "pdfkit": "^0.16.0",
     "sharp": "^0.33.5"
   },
   "devDependencies": {
+    "@mermaid-js/mermaid-cli": "^11.12.0",
     "@types/node": "^24.2.1",
-    "@types/sharp": "^0.31.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.2",
-    "@mermaid-js/mermaid-cli": "^11.12.0"
+    "typescript": "^5.9.2"
+  },
+  "optionalDependencies": {
+    "ffmpeg-static": "^5.3.0",
+    "ffprobe-static": "^3.1.0"
   }
 }

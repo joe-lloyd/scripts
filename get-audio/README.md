@@ -10,8 +10,15 @@ None. On first run the script downloads `ffmpeg` and `yt-dlp` into `tools\`
 (~160 MB, once). If either is already on this machine — including under
 `Downloads\ADStool\tools` — it reuses that copy instead of downloading again.
 
-Unlike the other tools in this repo, this one is PowerShell, not Node. There is
-nothing to `npm install`.
+It also reuses the repo's **shared** ffmpeg when one is there already: anything
+under `<repo>\tools\` (from `npm run setup:ffmpeg`) or the `ffmpeg-static` /
+`ffprobe-static` copies that the root `npm install` puts in `node_modules\`.
+`$env:FFMPEG_PATH` / `$env:FFPROBE_PATH` override the lot. The 160 MB download
+is only a fallback for when none of those exist.
+
+Unlike the other tools in this repo, this one is PowerShell, not Node — there is
+nothing to `npm install` for its own sake, though it will happily borrow what the
+root install already fetched.
 
 ## Usage
 

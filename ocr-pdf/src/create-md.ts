@@ -1,11 +1,17 @@
 import { readdir, readFile, writeFile, mkdir } from "node:fs/promises";
-import { join, extname, basename } from "node:path";
+import { join, extname, basename, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { PDFParse } from "pdf-parse"; // assuming the actual implementation matches your d.ts
 
-const OUT_DIR = join(process.cwd(), "out");
-const MD_DIR = join(process.cwd(), "md");
+// Anchor all directories on the package root (parent of src/), not on cwd,
+// so the script works no matter where it is launched from.
+const PKG_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+const OUT_DIR = join(PKG_ROOT, "out");
+const MD_DIR = join(PKG_ROOT, "md");
 
 async function ensureDirs() {
+    await mkdir(OUT_DIR, { recursive: true });
     await mkdir(MD_DIR, { recursive: true });
 }
 
@@ -134,12 +140,26 @@ async function main() {
         return;
     }
 
+    let ok = 0;
+    let failed = 0;
+
     for (const pdf of pdfs) {
         const fullPath = join(OUT_DIR, pdf);
-        await extractTextToMD(fullPath, MD_DIR);
+        try {
+            await extractTextToMD(fullPath, MD_DIR);
+            ok++;
+        } catch (err) {
+            failed++;
+            console.error(`⚠️ Failed: ${pdf}`);
+            console.error(err);
+            // continue with next PDF instead of killing everything
+        }
     }
 
-    console.log("🎉 All PDFs converted to Markdown");
+    console.log(`🎉 Done: ${ok} ok, ${failed} failed`);
+    if (failed > 0) {
+        process.exitCode = 1;
+    }
 }
 
 main().catch(err => {

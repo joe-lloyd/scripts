@@ -3,13 +3,12 @@ import * as path from "path";
 import sharp from "sharp";
 
 // Directories
-const inputDir = path.join(__dirname, "img-in");
-const outputDir = path.join(__dirname, "img-out");
+const inputDir = path.join(__dirname, "in");
+const outputDir = path.join(__dirname, "out");
 
-// Ensure output directory exists
-if (!fs.existsSync(outputDir)) {
-  fs.mkdirSync(outputDir, { recursive: true });
-}
+// Ensure input and output directories exist
+fs.mkdirSync(inputDir, { recursive: true });
+fs.mkdirSync(outputDir, { recursive: true });
 
 // Compression options - high quality
 const compressionOptions = {
@@ -36,58 +35,64 @@ const compressionOptions = {
   },
 };
 
+// Image formats sharp can decode (no .bmp - sharp has no BMP decoder)
+const supportedFormats = [
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".tiff",
+  ".tif",
+  ".webp",
+  ".avif",
+];
+
 // Process all files in the input directory
 async function processImages(): Promise<void> {
-  try {
-    // Read all files from input directory
-    const files = fs.readdirSync(inputDir);
+  const files = fs.readdirSync(inputDir);
 
-    if (files.length === 0) {
-      console.log("No files found in the input directory.");
-      return;
-    }
+  if (files.length === 0) {
+    console.log("No files found in the input directory.");
+    return;
+  }
 
-    console.log(`Found ${files.length} files to process.`);
+  console.log(`Found ${files.length} files to process.`);
 
-    // Process each file
-    for (const file of files) {
-      const inputPath = path.join(inputDir, file);
+  let compressed = 0;
+  let failed = 0;
+  let skipped = 0;
+
+  for (const file of files) {
+    const inputPath = path.join(inputDir, file);
+
+    try {
+      if (file === ".gitkeep") {
+        continue;
+      }
 
       // Skip directories and non-image files
       if (fs.statSync(inputPath).isDirectory()) {
         console.log(`Skipping directory: ${file}`);
+        skipped++;
         continue;
       }
 
-      // Get file extension
       const ext = path.extname(file).toLowerCase();
-      const fileNameWithoutExt = path.basename(file, ext);
 
-      // Check if it's an image file
-      const supportedFormats = [
-        ".jpg",
-        ".jpeg",
-        ".png",
-        ".gif",
-        ".bmp",
-        ".tiff",
-        ".webp",
-        ".avif",
-      ];
-      
       if (!supportedFormats.includes(ext)) {
         console.log(`Skipping non-image file: ${file}`);
+        skipped++;
         continue;
       }
 
       // Create output path with same extension
       const outputPath = path.join(outputDir, file);
-      
+
       console.log(`Compressing ${file} (keeping original format)...`);
-      
+
       // Process the image with sharp based on file type
       const image = sharp(inputPath);
-      
+
       switch (ext) {
         case ".jpg":
         case ".jpeg":
@@ -103,6 +108,7 @@ async function processImages(): Promise<void> {
           await image.avif(compressionOptions.avif).toFile(outputPath);
           break;
         case ".tiff":
+        case ".tif":
           await image.tiff(compressionOptions.tiff).toFile(outputPath);
           break;
         case ".gif":
@@ -110,20 +116,19 @@ async function processImages(): Promise<void> {
           // Just resave it through sharp
           await image.toFile(outputPath);
           break;
-        default:
-          // For other formats like BMP, convert to PNG for better compression
-          const newOutputPath = path.join(outputDir, `${fileNameWithoutExt}.png`);
-          await image.png(compressionOptions.png).toFile(newOutputPath);
-          console.log(`Converted ${file} to PNG for better compression`);
-          continue;
       }
 
       console.log(`Successfully compressed ${file}`);
+      compressed++;
+    } catch (error) {
+      console.error(`Error processing ${file}:`, error);
+      failed++;
     }
+  }
 
-    console.log("All images processed successfully!");
-  } catch (error) {
-    console.error("Error processing images:", error);
+  console.log(`Done: ${compressed} compressed, ${failed} failed, ${skipped} skipped`);
+  if (failed > 0) {
+    process.exitCode = 1;
   }
 }
 
