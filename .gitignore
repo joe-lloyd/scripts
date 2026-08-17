@@ -34,6 +34,9 @@ dist
 ocr-pdf/md/*
 !ocr-pdf/md/.gitkeep
 
+# --- keep-mac-awake: compiled per-machine on first run ---
+keep-mac-awake/bin/
+
 # --- Downloaded binaries (ffmpeg, yt-dlp) - never tracked ---
 # Shared across all tools; populated by `npm run setup:ffmpeg`
 tools/

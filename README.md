@@ -84,3 +84,7 @@ Run these directly with bash; they take no npm wiring.
 ## macOS desktop tools (`desktop-layout/`)
 
 `fix-desktops.py` reconciles Mission Control desktops and app-to-desktop bindings for one- and two-screen layouts; see its README for setup (Dock app, permissions) and the helper scripts (`add-spare-desktops.sh`, `count-windows.swift`).
+
+## macOS power tools (`keep-mac-awake/`)
+
+`keep-awake.sh on` keeps the Mac running with the lid closed, zeroing volume and screen brightness while it is shut and restoring both when it opens — for leaving a machine working headless in the background. `off` reverts, and a reboot always lands in the off state. Needs the Xcode command line tools (it compiles a small brightness helper on first run); see its README.
