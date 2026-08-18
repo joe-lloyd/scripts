@@ -97,7 +97,12 @@ case "${1:-status}" in
     ;;
   watch) watch ;;
   status)
-    case "$(pmset -g)" in *SleepDisabled*1*) echo "sleep   : disabled" ;; *) echo "sleep   : normal" ;; esac
+    # Field-exact: `pmset -g` prints one blob, so a glob like *SleepDisabled*1*
+    # also matches the `standby 1` line further down and always reports disabled.
+    case "$(pmset -g | awk '$1 == "SleepDisabled" { print $2 }')" in
+      1) echo "sleep   : disabled" ;;
+      *) echo "sleep   : normal (lid close will sleep — run \`$0 on\`)" ;;
+    esac
     pgrep -qf 'keep-awake.sh watch' && echo "watcher : running" || echo "watcher : stopped"
     echo "lid     : $(lid)"
     [ -f "$DAEMON" ] && echo "reset   : installed" || echo "reset   : not installed"
