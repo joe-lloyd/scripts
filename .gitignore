@@ -41,3 +41,6 @@ keep-mac-awake/bin/
 # Shared across all tools; populated by `npm run setup:ffmpeg`
 tools/
 get-audio/tools/
+
+# --- scrape-booru: personal Gelbooru API credentials ---
+scrape-booru/credentials.json

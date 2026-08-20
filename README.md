@@ -66,6 +66,19 @@ All four use ffmpeg, which `npm install` already provided — see [ffmpeg](#ffmp
 | `unrar-files` | `npm run unrar-files:extract` | Extract `.rar` archives |
 | `dedupe-files` | `npm run dedupe-files:scan -- "C:\some\folder"` | Find duplicate files by SHA-256; `--move` relocates them (never deletes) |
 
+## Dataset tools
+
+| Tool | Command | What it does |
+|---|---|---|
+| `scrape-booru` | `npm run scrape-booru:scrape` | Ask which character, then build a captioned LoRA training set from Gelbooru (capped at 1024px) |
+| | `npm run scrape-booru:scrape -- --resize-only` | Re-cap datasets already in `out/` without downloading |
+| `scrape-wiki` | `npm run scrape-wiki:scrape` | Same, from a game wiki (MediaWiki) — official renders and in-game screenshots rather than fan art |
+| | `npm run scrape-wiki:sheet -- <dir> <out.jpg>` | Lay a dataset out as one numbered grid image for review |
+| | `npm run scrape-wiki:crop -- <image> right:40%` | Trim one image by hand, for frames face detection cannot fix |
+| `merge-datasets` | `npm run merge-datasets:merge` | Gather both sources into `out/<character>/`, one folder per character |
+
+Both write `out/<character>/` with a `.txt` caption per image, capped at 1024px, plus a manifest. They share `lib/dataset-image.js`, which verifies that a download really is an image before keeping it, caps it on the way in, and — with `--crop` — detects faces to crop a second person out of frame.
+
 ## Git & shell helpers (`bash/`, `git-split-commits/`)
 
 Run these directly with bash; they take no npm wiring.

@@ -15,6 +15,7 @@
     "dedupe-files:scan": "node dedupe-files/index.js",
     "extract-audio:extract": "node extract-audio/index.js",
     "img-to-pdf:convert": "node img-to-pdf/images-to-pdf.js",
+    "merge-datasets:merge": "node merge-datasets/index.js",
     "mermaid-to-img:render": "node mermaid-to-img/index.js",
     "ocr-pdf:ocr": "npm --prefix ocr-pdf run ocr",
     "ocr-pdf:md": "npm --prefix ocr-pdf run md",
@@ -22,6 +23,10 @@
     "remove-img-bg:archive": "node lib/archive.js remove-img-bg",
     "remove-img-bg:process-and-archive": "npm run remove-img-bg:process && npm run remove-img-bg:archive",
     "resize-img:resize": "node resize-img/index.js",
+    "scrape-booru:scrape": "node scrape-booru/index.js",
+    "scrape-wiki:scrape": "node scrape-wiki/index.js",
+    "scrape-wiki:sheet": "node scrape-wiki/contact-sheet.js",
+    "scrape-wiki:crop": "node scrape-wiki/crop.js",
     "strip-exif:strip": "node strip-exif/index.js",
     "unrar-files:extract": "cd unrar-files && npx ts-node unrar.ts",
     "video-to-gif:convert": "node video-to-gif/index.js"
@@ -30,6 +35,8 @@
   "license": "ISC",
   "dependencies": {
     "@imgly/background-removal-node": "^1.4.5",
+    "@tensorflow-models/blazeface": "^0.1.0",
+    "@tensorflow/tfjs": "^4.22.0",
     "node-unrar-js": "^2.0.2",
     "pdfkit": "^0.16.0",
     "sharp": "^0.33.5"
