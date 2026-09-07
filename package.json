@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "description": "Personal collection of small batch utility scripts: images, video, audio, PDFs, and git helpers. Each tool lives in its own folder and follows the in/ -> out/ convention.",
   "scripts": {
+    "mcp": "node mcp/http.js",
+    "mcp:stdio": "node mcp/stdio.js",
+    "mcp:install": "node mcp/install.js",
+    "mcp:call": "node mcp/call.js",
+    "mcp:test": "node mcp/smoke-test.js",
     "setup:ffmpeg": "node lib/setup-ffmpeg.js",
     "compress-img:compress": "cd compress-img && npx ts-node compress.ts",
     "compress-img:compress-original": "cd compress-img && npx ts-node compress-original-type.ts",
@@ -35,6 +40,7 @@
   "license": "ISC",
   "dependencies": {
     "@imgly/background-removal-node": "^1.4.5",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@tensorflow-models/blazeface": "^0.1.0",
     "@tensorflow/tfjs": "^4.22.0",
     "node-unrar-js": "^2.0.2",

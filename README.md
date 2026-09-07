@@ -79,6 +79,21 @@ All four use ffmpeg, which `npm install` already provided — see [ffmpeg](#ffmp
 
 Both write `out/<character>/` with a `.txt` caption per image, capped at 1024px, plus a manifest. They share `lib/dataset-image.js`, which verifies that a download really is an image before keeping it, caps it on the way in, and — with `--crop` — detects faces to crop a second person out of frame.
 
+## Using these tools from other projects (`mcp/`)
+
+`mcp/` is a stateless MCP server exposing all of the above as 28 tools, so any
+project on this machine can use them without a copy of this repo.
+
+```
+npm run mcp                            # start it (127.0.0.1:7391)
+node mcp/install.js ../my-project      # point a project at it
+```
+
+One server, shared by every project. Long tools hand back a job id rather than
+blocking; file tools take absolute paths and stage around each script's own
+`in/` and `out/` folders. `character_pack` does audio, both image sources and
+the merge for one character as a single job. See [mcp/README.md](mcp/README.md).
+
 ## Git & shell helpers (`bash/`, `git-split-commits/`)
 
 Run these directly with bash; they take no npm wiring.
