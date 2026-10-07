@@ -16,6 +16,7 @@
     "compress-img:compress-original-and-archive": "npm run compress-img:compress-original && npm run compress-img:archive",
     "compress-video:compress": "npm --prefix compress-video run compress",
     "compress-video:convert": "npm --prefix compress-video run convert",
+    "crop-top:crop": "npx ts-node --project crop-top/tsconfig.json crop-top/crop-top.ts",
     "convert-img:convert": "node convert-img/index.js",
     "dedupe-files:scan": "node dedupe-files/index.js",
     "extract-audio:extract": "node extract-audio/index.js",

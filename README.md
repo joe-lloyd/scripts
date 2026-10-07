@@ -40,6 +40,7 @@ The bundled binaries add about 80 MB to `npm install`. On a machine where you on
 | | `npm run compress-img:compress-original` | Recompress images keeping their original format |
 | | `npm run compress-img:archive` | Archive processed files out of `in/` and `out/` |
 | `convert-img` | `npm run convert-img:convert -- --to png` | Convert images between formats (png/jpg/webp/avif/tiff) |
+| `crop-top` | `npm run crop-top:crop -- /path/to/folder --px 20` | Cut N pixels (default 20) off the top of every image in a folder |
 | `resize-img` | `npm run resize-img:resize -- --width 1280` | Batch resize (`--width`/`--height`/`--scale`), never upscales |
 | `strip-exif` | `npm run strip-exif:strip` | Remove EXIF/GPS/XMP metadata; orientation preserved by rotating pixels |
 | `remove-img-bg` | `npm run remove-img-bg:process` | Remove image backgrounds (@imgly/background-removal) |
